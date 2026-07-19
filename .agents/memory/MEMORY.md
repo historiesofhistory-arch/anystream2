@@ -1,0 +1,1 @@
+- [AnimeDekho fallback chain](animedekho-fallback.md) — trid needs cookie; trdekho server IDs discovered live; search-based tertiary implemented
