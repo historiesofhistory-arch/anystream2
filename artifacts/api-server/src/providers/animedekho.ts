@@ -575,7 +575,7 @@ async function searchAdwSeries(
 
 /**
  * Fetch the trid (internal episode post ID) from the episode page WITH cookie.
- * data-lmt JWT is only injected into the page when the verified cookie is present.
+ * data-lmt JWT is only injected into the TV episode page when the verified cookie is present.
  */
 async function fetchTridWithCookie(
   episodeSlug: string,
@@ -600,19 +600,49 @@ async function fetchTridWithCookie(
 }
 
 /**
- * Call trdekho endpoint with cookie and extract iframe src from the response.
- *   trdekho=0 → HydraX
- *   trdekho=1 → SRuby
+ * Fetch trid from a movie series page.
+ * data-lmt is present on the movie page WITHOUT cookie (unlike TV episodes).
+ * Movies use trtype=1; no cookie/verify flow required.
+ */
+async function fetchTridFromMoviePage(
+  moviePageUrl: string,
+): Promise<number | null> {
+  try {
+    const res = await fetchWithTimeout(
+      moviePageUrl,
+      { headers: ANIMEDEKHO_HEADERS },
+      12_000,
+    );
+    const html = await res.text();
+    const lmtB64 = html.match(/data-lmt="([^"]+)"/)?.[1];
+    if (!lmtB64) return null;
+    const payload = JSON.parse(
+      Buffer.from(lmtB64, "base64").toString("utf8"),
+    ) as { lmt?: { id?: number } };
+    return payload?.lmt?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Call trdekho endpoint and extract iframe src from the response.
+ *   trdekho=0 → HydraX   trdekho=1 → SRuby
+ *   trtype=2 → TV series  trtype=1 → Movie
+ *   TV episodes require the verified cookie; movies do not.
  */
 async function fetchTrdekhoIframeSrc(
   trid: number,
   trdekho: 0 | 1,
-  cookie: string,
+  cookie: string | null,
+  trtype: 1 | 2 = 2,
 ): Promise<string | null> {
   try {
+    const headers: Record<string, string> = { ...ANIMEDEKHO_HEADERS };
+    if (cookie) headers.Cookie = cookie;
     const res = await fetchWithTimeout(
-      `https://animedekho.app/?trdekho=${trdekho}&trid=${trid}&trtype=2`,
-      { headers: { ...ANIMEDEKHO_HEADERS, Cookie: cookie } },
+      `https://animedekho.app/?trdekho=${trdekho}&trid=${trid}&trtype=${trtype}`,
+      { headers },
       12_000,
     );
     const html = await res.text();
@@ -648,7 +678,7 @@ async function resolveViaSearchFallback(
 
   // ── Movie path ──────────────────────────────────────────────────────────────
   if (isMovie || isMovieHint) {
-    // Try VidStream CDN embed first (ep param unused for movies)
+    // Priority 1: VidStream CDN embed (needs TMDB ID)
     if (tmdbId) {
       const html = await fetchMovieEmbedHtml(tmdbId);
       if (html && htmlIsFound(html)) {
@@ -659,16 +689,22 @@ async function resolveViaSearchFallback(
         }
       }
     }
-    // Fallback: trdekho servers for movie (episode 1)
-    const movieSlug = `${seriesSlug}-1x1`;
-    const cookie = await ensureVerifiedCookie(movieSlug);
-    if (!cookie) throw Object.assign(new Error("Cookie unavailable"), { code: "UPSTREAM_ERROR" });
-    const trid = await fetchTridWithCookie(movieSlug, cookie);
-    if (!trid) throw Object.assign(new Error(`trid not found for movie slug ${movieSlug}`), { code: "EP_NOT_FOUND" });
+
+    // Priority 2 & 3: trdekho via movie series page (trtype=1, no cookie needed)
+    // data-lmt is present on the movie page without cookie; movies use trtype=1.
+    const moviePageUrl = `https://animedekho.app/movie-hindi/${seriesSlug}/`;
+    const trid = await fetchTridFromMoviePage(moviePageUrl);
+    if (!trid) {
+      throw Object.assign(
+        new Error(`trid not found on movie page ${moviePageUrl}`),
+        { code: "EP_NOT_FOUND" },
+      );
+    }
+
     for (const trdekho of [0, 1] as const) {
-      const src = await fetchTrdekhoIframeSrc(trid, trdekho, cookie);
+      const src = await fetchTrdekhoIframeSrc(trid, trdekho, null, 1);
       if (src) {
-        logger.info({ anilistId, movieSlug, trdekho, src }, "[animedekho-search] Movie via trdekho");
+        logger.info({ anilistId, moviePageUrl, trid, trdekho, src }, "[animedekho-search] Movie via trdekho");
         return src;
       }
     }
@@ -767,9 +803,24 @@ export async function resolveAnimeDekhoUrl(
   const map = await getFribbMap();
   const mapping = map.get(Number(anilistId));
 
-  // ── Movie: CDN embed only (watch-page is TV-only) ───────────────────────────
+  // ── Movie: CDN embed first, then search-based fallback ──────────────────────
   if (mapping?.isMovie) {
-    return resolveMovieCdnUrl(mapping.tmdbId, anilistId);
+    try {
+      return await resolveMovieCdnUrl(mapping.tmdbId, anilistId);
+    } catch (err: any) {
+      if (err?.code === "UPSTREAM_ERROR") throw err;
+      logger.info(
+        { anilistId, tmdbId: mapping.tmdbId, code: err?.code },
+        "[animedekho] Movie CDN not found — trying search fallback",
+      );
+      const aniMedia = await fetchAniMedia(anilistId).catch(() => null);
+      const titles = [
+        aniMedia?.title?.english,
+        aniMedia?.title?.romaji,
+        ...(aniMedia?.synonyms ?? []),
+      ].filter(Boolean) as string[];
+      return resolveViaSearchFallback(anilistId, "1", titles, true);
+    }
   }
 
   // ── TV series: attempt CDN embed first ─────────────────────────────────────
