@@ -18,8 +18,9 @@ const ALLOWED_HOSTS = new Set([
   // AnimeDekho CDN hosts — fetched server-side with Referer: animedekho.app
   "as-cdn21.top",
   "play.zephyrflick.top",
-  // AnimeDekho trdekho player — proxied to strip JW ads
+  // AnimeDekho trdekho players — proxied to strip ad scripts
   "abyssplayer.com",
+  "cloudy.upns.one",   // trdekho=2 MirrorBot
 ]);
 
 // Per-host Referer override — defaults to anineko.to for other hosts
@@ -27,6 +28,7 @@ const HOST_REFERER: Record<string, string> = {
   "as-cdn21.top": "https://animedekho.app/",
   "play.zephyrflick.top": "https://animedekho.app/",
   "abyssplayer.com": "https://animedekho.app/",
+  "cloudy.upns.one": "https://animedekho.app/",
 };
 
 // Per-host ad script patterns to strip
@@ -46,6 +48,13 @@ const AD_PATTERNS: Record<string, RegExp[]> = {
   "otakuhg.site": [
     /\(function\(s\)\{s\.dataset\.zone=[^}]+\}\)\([^)]+\)/g,
     /<script[^>]*al5sm\.com[^>]*>[\s\S]*?<\/script>/gi,
+  ],
+  // cloudy.upns.one (MirrorBot): strip JW advertising and popup/redirect scripts
+  "cloudy.upns.one": [
+    /<script[^>]+src="[^"]*jwpsrv\.js[^"]*"[^>]*><\/script>/gi,
+    /<script[^>]+src="[^"]*googletagmanager[^"]*"[^>]*><\/script>/gi,
+    /<script[^>]*\bads?\b[^>]*src="[^"]*"[^>]*><\/script>/gi,
+    /window\.dataLayer\s*=\s*window\.dataLayer[^;]*;/g,
   ],
   // abyssplayer.com: strip JW advertising + Google Analytics + domain redirect check
   "abyssplayer.com": [

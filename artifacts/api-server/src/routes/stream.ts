@@ -130,7 +130,8 @@ router.get(
         //   sandbox must remain OFF (abyssplayer detects and rejects it).
         // All other trdekho player URLs → embed directly, no sandbox.
         const CDN_EMBED_HOSTS = new Set(["as-cdn21.top", "play.zephyrflick.top"]);
-        const PROXY_PLAYER_HOSTS = new Set(["abyssplayer.com"]);
+        // trdekho player hosts routed through /api/proxy to strip ad scripts
+        const PROXY_PLAYER_HOSTS = new Set(["abyssplayer.com", "cloudy.upns.one"]);
         let useSandbox = false;
         let embedUrl = cdnUrl;
         try {

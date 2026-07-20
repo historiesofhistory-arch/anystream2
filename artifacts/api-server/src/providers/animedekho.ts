@@ -602,8 +602,42 @@ async function searchAdwSeries(
             null;
         }
 
-        // ── Guard 2: title verification — reject results that share no words ────
-        if (adwTitle && !titlesOverlap(adwTitle, titles)) {
+        // ── Guard 3: AniList ID redirect verification (authoritative check) ─────
+        // AnimeDekho series pages have a badge link:
+        //   <a href="…/download/map/anilist.php?id={N}">AniList</a>
+        // Following that URL redirects to https://anilist.co/anime/{actualId}.
+        // If the redirect destination matches our requested AniList ID → 100% match.
+        // Falls through to Guard 2 (word-overlap) if tmdbId is absent or network fails.
+        let anilistIdVerified = false;
+        if (tmdbId) {
+          try {
+            const vRes = await fetchWithTimeout(
+              `https://animedekho.app/download/map/anilist.php?id=${tmdbId}`,
+              { headers: ANIMEDEKHO_HEADERS },
+              8_000,
+            );
+            // fetch follows redirects by default; vRes.url is the final destination
+            const redirectAnilistId = vRes.url.match(
+              /anilist\.co\/anime\/(\d+)/i,
+            )?.[1];
+            if (redirectAnilistId) {
+              if (redirectAnilistId !== anilistId) {
+                logger.info(
+                  { anilistId, slug, tmdbId, redirectAnilistId },
+                  "[animedekho-search] AniList ID mismatch — rejecting, trying next variant",
+                );
+                continue;
+              }
+              // Redirect matched — skip word-overlap (Guard 2), accept immediately
+              anilistIdVerified = true;
+            }
+          } catch {
+            // Network error → fall through to word-overlap guard below
+          }
+        }
+
+        // ── Guard 2: title word-overlap (fallback when redirect check unavailable) ──
+        if (!anilistIdVerified && adwTitle && !titlesOverlap(adwTitle, titles)) {
           logger.info(
             { anilistId, slug, adwTitle, titles },
             "[animedekho-search] Title mismatch — rejecting result, trying next variant",
@@ -612,7 +646,7 @@ async function searchAdwSeries(
         }
 
         logger.info(
-          { anilistId, title, slug, tmdbId, isMovie, adwTitle },
+          { anilistId, title, slug, tmdbId, isMovie, adwTitle, anilistIdVerified },
           "[animedekho-search] Series found via AnimeDekho search",
         );
         return { seriesSlug: slug, tmdbId, isMovie };
@@ -678,13 +712,15 @@ async function fetchTridFromMoviePage(
 
 /**
  * Call trdekho endpoint and extract iframe src from the response.
- *   trdekho=0 → HydraX   trdekho=1 → SRuby
+ *   trdekho=0 → HydraX (abyssplayer.com)
+ *   trdekho=1 → SRuby  (rubystm.com)
+ *   trdekho=2 → MirrorBot (cloudy.upns.one)
  *   trtype=2 → TV series  trtype=1 → Movie
  *   TV episodes require the verified cookie; movies do not.
  */
 async function fetchTrdekhoIframeSrc(
   trid: number,
-  trdekho: 0 | 1,
+  trdekho: 0 | 1 | 2,
   cookie: string | null,
   trtype: 1 | 2 = 2,
 ): Promise<string | null> {
@@ -741,8 +777,9 @@ async function resolveViaSearchFallback(
       }
     }
 
-    // Priority 2 & 3: trdekho via movie series page (trtype=1, no cookie needed)
+    // Priority 2-4: trdekho via movie series page (trtype=1, no cookie needed)
     // data-lmt is present on the movie page without cookie; movies use trtype=1.
+    // Order: MirrorBot (cloudy.upns.one, ad-strippable via proxy) → HydraX → SRuby
     const moviePageUrl = `https://animedekho.app/movie-hindi/${seriesSlug}/`;
     const trid = await fetchTridFromMoviePage(moviePageUrl);
     if (!trid) {
@@ -752,7 +789,7 @@ async function resolveViaSearchFallback(
       );
     }
 
-    for (const trdekho of [0, 1] as const) {
+    for (const trdekho of [2, 0, 1] as const) {
       const src = await fetchTrdekhoIframeSrc(trid, trdekho, null, 1);
       if (src) {
         logger.info({ anilistId, moviePageUrl, trid, trdekho, src }, "[animedekho-search] Movie via trdekho");
@@ -803,8 +840,9 @@ async function resolveViaSearchFallback(
     );
   }
 
-  // trdekho=0 → HydraX, trdekho=1 → SRuby
-  for (const trdekho of [0, 1] as const) {
+  // Priority order: MirrorBot (cloudy.upns.one, ad-strippable via proxy) →
+  //                 HydraX (abyssplayer.com, proxied) → SRuby (rubystm.com)
+  for (const trdekho of [2, 0, 1] as const) {
     const src = await fetchTrdekhoIframeSrc(trid, trdekho, cookie);
     if (src) {
       logger.info(
@@ -816,7 +854,7 @@ async function resolveViaSearchFallback(
   }
 
   throw Object.assign(
-    new Error(`All servers (HydraX, SRuby) exhausted for ${episodeSlug}`),
+    new Error(`All servers (MirrorBot, HydraX, SRuby) exhausted for ${episodeSlug}`),
     { code: "CDN_NOT_FOUND" },
   );
 }
