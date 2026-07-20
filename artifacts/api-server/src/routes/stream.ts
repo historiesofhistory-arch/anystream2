@@ -125,7 +125,12 @@ router.get(
     if (provider === "ad") {
       try {
         const cdnUrl = await resolveAnimeDekhoUrl(anilistId, epNo);
-        res.send(buildPage(cdnUrl, anilistId, epNo, true));
+        // Only sandbox pure CDN player URLs — trdekho player embeds (abyssplayer.com,
+        // rubystm.com, cloudy.upns.one) explicitly detect and reject the sandbox attribute.
+        const CDN_EMBED_HOSTS = new Set(["as-cdn21.top", "play.zephyrflick.top"]);
+        let useSandbox = false;
+        try { useSandbox = CDN_EMBED_HOSTS.has(new URL(cdnUrl).hostname); } catch { /* non-URL */ }
+        res.send(buildPage(cdnUrl, anilistId, epNo, useSandbox));
       } catch (err: any) {
         if (err?.code === "NO_MAPPING") {
           res.status(404).json({

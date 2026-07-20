@@ -410,12 +410,12 @@ async function fetchTrid(episodeSlug: string): Promise<number> {
 const watchIframeCache = new TtlCache<string>(5 * 60_000);
 const WATCH_IFRAME_TTL = 30 * 60_000;
 
-/** Server IDs to try in order: 1=HydraX, 2=MirrorBot. */
-const TRDEKHO_SERVERS = [1, 2] as const;
+/** Server IDs to try in order: 0=HydraX (abyssplayer), 1=SRuby, 2=MirrorBot. */
+const TRDEKHO_SERVERS = [0, 1, 2] as const;
 
 async function fetchWatchIframeUrl(
   trid: number,
-  server: 1 | 2,
+  server: 0 | 1 | 2,
   cookie: string,
 ): Promise<string> {
   return watchIframeCache.dedupe(
