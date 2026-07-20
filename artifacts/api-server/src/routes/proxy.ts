@@ -146,8 +146,12 @@ router.get("/proxy", async (req, res) => {
           (_, quote, m3u8Url) =>
             `${quote}/api/m3u8?url=${encodeURIComponent(m3u8Url)}${quote}`,
         );
-        // Inject popup blocker
-        raw = raw.replace("</head>", `${POPUP_BLOCKER}\n</head>`);
+        // Inject popup blocker — skip for abyssplayer.com: it detects overwritten
+        // window.open via toString() check (isUseExtension) and shows "AdBlock/Sandbox"
+        // warning. Ad scripts are already stripped for abyssplayer, so no popups occur.
+        if (parsed.hostname !== "abyssplayer.com") {
+          raw = raw.replace("</head>", `${POPUP_BLOCKER}\n</head>`);
+        }
         return raw;
       },
       PROXY_TTL,
