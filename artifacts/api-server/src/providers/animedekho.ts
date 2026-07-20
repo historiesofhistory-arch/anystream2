@@ -516,8 +516,41 @@ const adwSearchCache = new TtlCache<AdwSeriesInfo | null>(5 * 60_000);
 const ADW_SEARCH_TTL = 6 * 60 * 60_000; // 6 h
 
 /**
+ * Return significant words (≥ 4 chars) from a title string, normalised to lowercase.
+ * Used to cross-check AnimeDekho search results against known AniList titles.
+ */
+function titleWords(s: string): string[] {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter((w) => w.length >= 4);
+}
+
+/**
+ * Check whether an AnimeDekho page title is a plausible match for at least one
+ * of the known AniList title variants.  Returns true when the two share at least
+ * one significant word (≥ 4 chars) — enough to reject "BLOOM" → wrong anime.
+ */
+function titlesOverlap(adwPageTitle: string, anilistTitles: string[]): boolean {
+  const adwWords = new Set(titleWords(adwPageTitle));
+  for (const t of anilistTitles) {
+    if (!t) continue;
+    const tw = titleWords(t);
+    if (tw.some((w) => adwWords.has(w))) return true;
+  }
+  return false;
+}
+
+/**
  * Search AnimeDekho by title and return series slug + TMDB ID.
  * Tries all title variants in order; caches result 6 h per AniList ID.
+ *
+ * Safeguards against false matches:
+ *   1. Skips title variants shorter than 6 chars (e.g. "BLOOM") — too generic.
+ *   2. Verifies the AnimeDekho series H1 title shares ≥ 1 significant word with
+ *      the AniList title before accepting the result.
  */
 async function searchAdwSeries(
   anilistId: string,
@@ -528,7 +561,9 @@ async function searchAdwSeries(
     cacheKey,
     async () => {
       for (const title of titles) {
-        if (!title) continue;
+        // ── Guard 1: skip trivially-short titles (too many false matches) ───────
+        if (!title || title.trim().length < 6) continue;
+
         const res = await fetchWithTimeout(
           `https://animedekho.app/?s=${encodeURIComponent(title)}`,
           { headers: ANIMEDEKHO_HEADERS },
@@ -537,7 +572,8 @@ async function searchAdwSeries(
         if (!res?.ok) continue;
 
         const html = await res.text();
-        // Match /series-hindi/{slug}/ or /movie-hindi/{slug}/ links
+        // Match /series-hindi/{slug}/ or /movie-hindi/{slug}/ content links
+        // (skip nav-level hrefs which only end in /series-hindi/ or /movies-hindi/)
         const match = html.match(
           /href="https:\/\/animedekho\.app\/(series-hindi|movie-hindi)\/([^"\/]+)\/"/,
         );
@@ -546,7 +582,7 @@ async function searchAdwSeries(
         const [, type, slug] = match;
         const isMovie = type === "movie-hindi";
 
-        // Fetch series page to extract TMDB ID from the AniList badge link
+        // Fetch series page to extract TMDB ID + page title for verification
         const sRes = await fetchWithTimeout(
           `https://animedekho.app/${type}/${slug}/`,
           { headers: ANIMEDEKHO_HEADERS },
@@ -554,14 +590,29 @@ async function searchAdwSeries(
         ).catch(() => null);
 
         let tmdbId: number | null = null;
+        let adwTitle: string | null = null;
         if (sRes?.ok) {
           const sHtml = await sRes.text();
           const m = sHtml.match(/anilist\.php\?id=(\d+)/);
           if (m) tmdbId = Number(m[1]);
+          // H1 is the cleanest source: "Chainsmoker Cat" — no site suffix
+          adwTitle =
+            sHtml.match(/<h1[^>]*>([^<]+)/i)?.[1]?.trim() ??
+            sHtml.match(/<meta[^>]+property="og:title"[^>]+content="([^"]+)"/i)?.[1]?.trim() ??
+            null;
+        }
+
+        // ── Guard 2: title verification — reject results that share no words ────
+        if (adwTitle && !titlesOverlap(adwTitle, titles)) {
+          logger.info(
+            { anilistId, slug, adwTitle, titles },
+            "[animedekho-search] Title mismatch — rejecting result, trying next variant",
+          );
+          continue;
         }
 
         logger.info(
-          { anilistId, title, slug, tmdbId, isMovie },
+          { anilistId, title, slug, tmdbId, isMovie, adwTitle },
           "[animedekho-search] Series found via AnimeDekho search",
         );
         return { seriesSlug: slug, tmdbId, isMovie };

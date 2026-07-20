@@ -134,7 +134,7 @@ router.get(
       } catch (err: any) {
         if (err?.code === "NO_MAPPING") {
           res.status(404).json({
-            error: "No TMDB mapping found for this AniList ID in Fribb's anime-lists",
+            error: "Anime not available on AnimeDekho in Hindi dub",
             anilistId,
           });
         } else if (err?.code === "EP_NOT_FOUND") {
