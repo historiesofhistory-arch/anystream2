@@ -18,12 +18,15 @@ const ALLOWED_HOSTS = new Set([
   // AnimeDekho CDN hosts — fetched server-side with Referer: animedekho.app
   "as-cdn21.top",
   "play.zephyrflick.top",
+  // AnimeDekho trdekho player — proxied to strip JW ads
+  "abyssplayer.com",
 ]);
 
 // Per-host Referer override — defaults to anineko.to for other hosts
 const HOST_REFERER: Record<string, string> = {
   "as-cdn21.top": "https://animedekho.app/",
   "play.zephyrflick.top": "https://animedekho.app/",
+  "abyssplayer.com": "https://animedekho.app/",
 };
 
 // Per-host ad script patterns to strip
@@ -43,6 +46,20 @@ const AD_PATTERNS: Record<string, RegExp[]> = {
   "otakuhg.site": [
     /\(function\(s\)\{s\.dataset\.zone=[^}]+\}\)\([^)]+\)/g,
     /<script[^>]*al5sm\.com[^>]*>[\s\S]*?<\/script>/gi,
+  ],
+  // abyssplayer.com: strip JW advertising + Google Analytics + domain redirect check
+  "abyssplayer.com": [
+    // JW Platform advertising service — removes pre-roll/mid-roll video ads
+    /<script[^>]+src="[^"]*jwpsrv\.js[^"]*"[^>]*><\/script>/gi,
+    // Google Tag Manager
+    /<script[^>]+src="[^"]*googletagmanager[^"]*"[^>]*><\/script>/gi,
+    // GTM inline initialisation
+    /window\.dataLayer\s*=\s*window\.dataLayer[^;]*;/g,
+    /function\s+gtag\s*\(\)\s*\{[^}]+\}/g,
+    /gtag\s*\([^)]*\)\s*;/g,
+    // Domain redirect guard: abyssplayer redirects to abyss.to when not on that domain.
+    // We're serving from our proxy domain, so strip this check entirely.
+    /if\s*\(\s*top\.location\s*==\s*self\.location[^{]*\{[^}]*window\.location\s*=[^}]*\}/g,
   ],
 };
 

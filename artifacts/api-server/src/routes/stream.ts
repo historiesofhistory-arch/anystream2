@@ -125,12 +125,23 @@ router.get(
     if (provider === "ad") {
       try {
         const cdnUrl = await resolveAnimeDekhoUrl(anilistId, epNo);
-        // Only sandbox pure CDN player URLs — trdekho player embeds (abyssplayer.com,
-        // rubystm.com, cloudy.upns.one) explicitly detect and reject the sandbox attribute.
+        // CDN embed hosts → sandbox (blocks popup ads) and embed directly.
+        // abyssplayer.com → route through proxy to strip JW advertising scripts;
+        //   sandbox must remain OFF (abyssplayer detects and rejects it).
+        // All other trdekho player URLs → embed directly, no sandbox.
         const CDN_EMBED_HOSTS = new Set(["as-cdn21.top", "play.zephyrflick.top"]);
+        const PROXY_PLAYER_HOSTS = new Set(["abyssplayer.com"]);
         let useSandbox = false;
-        try { useSandbox = CDN_EMBED_HOSTS.has(new URL(cdnUrl).hostname); } catch { /* non-URL */ }
-        res.send(buildPage(cdnUrl, anilistId, epNo, useSandbox));
+        let embedUrl = cdnUrl;
+        try {
+          const hostname = new URL(cdnUrl).hostname;
+          if (CDN_EMBED_HOSTS.has(hostname)) {
+            useSandbox = true;
+          } else if (PROXY_PLAYER_HOSTS.has(hostname)) {
+            embedUrl = `/api/proxy?url=${encodeURIComponent(cdnUrl)}`;
+          }
+        } catch { /* non-URL, embed as-is */ }
+        res.send(buildPage(embedUrl, anilistId, epNo, useSandbox));
       } catch (err: any) {
         if (err?.code === "NO_MAPPING") {
           res.status(404).json({
