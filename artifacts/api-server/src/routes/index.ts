@@ -6,6 +6,7 @@ import echoRouter from "./echo.js";
 import animeRouter from "./anime.js";
 import anilistRouter from "./anilist.js";
 import streamRouter from "./stream.js";
+import adwtestRouter from "./adwtest.js";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(echoRouter);
 router.use(animeRouter);
 router.use(anilistRouter);
 router.use(streamRouter);
+router.use(adwtestRouter); // AnimeDekho server diagnostic — testing only
 
 export default router;

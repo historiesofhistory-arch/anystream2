@@ -777,9 +777,9 @@ async function resolveViaSearchFallback(
       }
     }
 
-    // Priority 2-4: trdekho via movie series page (trtype=1, no cookie needed)
+    // Priority 2 & 3: trdekho via movie series page (trtype=1, no cookie needed)
     // data-lmt is present on the movie page without cookie; movies use trtype=1.
-    // Order: MirrorBot (cloudy.upns.one, ad-strippable via proxy) → HydraX → SRuby
+    // Order: HydraX (trdekho=0) → SRuby (trdekho=1)
     const moviePageUrl = `https://animedekho.app/movie-hindi/${seriesSlug}/`;
     const trid = await fetchTridFromMoviePage(moviePageUrl);
     if (!trid) {
@@ -789,7 +789,7 @@ async function resolveViaSearchFallback(
       );
     }
 
-    for (const trdekho of [2, 0, 1] as const) {
+    for (const trdekho of [0, 1] as const) {
       const src = await fetchTrdekhoIframeSrc(trid, trdekho, null, 1);
       if (src) {
         logger.info({ anilistId, moviePageUrl, trid, trdekho, src }, "[animedekho-search] Movie via trdekho");
@@ -840,9 +840,8 @@ async function resolveViaSearchFallback(
     );
   }
 
-  // Priority order: MirrorBot (cloudy.upns.one, ad-strippable via proxy) →
-  //                 HydraX (abyssplayer.com, proxied) → SRuby (rubystm.com)
-  for (const trdekho of [2, 0, 1] as const) {
+  // Priority order: HydraX (abyssplayer.com) → SRuby (rubystm.com)
+  for (const trdekho of [0, 1] as const) {
     const src = await fetchTrdekhoIframeSrc(trid, trdekho, cookie);
     if (src) {
       logger.info(
@@ -854,7 +853,7 @@ async function resolveViaSearchFallback(
   }
 
   throw Object.assign(
-    new Error(`All servers (MirrorBot, HydraX, SRuby) exhausted for ${episodeSlug}`),
+    new Error(`All servers (HydraX, SRuby) exhausted for ${episodeSlug}`),
     { code: "CDN_NOT_FOUND" },
   );
 }
