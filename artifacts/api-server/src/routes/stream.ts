@@ -5,6 +5,7 @@ import {
   type AninekoType,
 } from "../providers/anineko.js";
 import { resolveAnimeDekhoUrl } from "../providers/animedekho.js";
+import { resolveAnimeDekhoHls } from "../providers/animedekho-hls.js";
 import { TtlCache, fetchWithTimeout } from "../lib/cache.js";
 import { fetchAniMedia } from "../lib/anilist.js";
 
@@ -177,6 +178,30 @@ router.get(
             detail: err?.message,
           });
         }
+      }
+      return;
+    }
+
+    // ── ADT provider (AnimeDekho HLS — test) ─────────────────────────────
+    // Fallback / watch-page system only. Extracts direct HLS m3u8 URL from
+    // AnimeDekho's servers (VidMoly → VidCloud → SRuby → MirrorXerver → Pixeldrain).
+    // Skips VidStream CDN, HydraX, and MirrorBot as instructed.
+    // Returns JSON { hls, server, serverName, embedUrl, proxyNeeded, workingReferer }.
+    if (provider === "adt") {
+      try {
+        const hlsResult = await resolveAnimeDekhoHls(anilistId, epNo);
+        res.setHeader("Cache-Control", "public, max-age=120"); // 2 min — m3u8 URLs expire
+        res.json(hlsResult);
+      } catch (err: any) {
+        const status =
+          err?.code === "EP_NOT_FOUND" || err?.code === "NO_TITLE" ? 404 :
+          err?.code === "CDN_NOT_FOUND" ? 502 : 502;
+        res.status(status).json({
+          error: err?.message ?? "AnimeDekho HLS extraction failed",
+          code: err?.code ?? "UPSTREAM_ERROR",
+          anilistId,
+          epNo,
+        });
       }
       return;
     }
