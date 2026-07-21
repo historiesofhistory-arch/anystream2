@@ -134,6 +134,7 @@ router.get(
         const PROXY_PLAYER_HOSTS = new Set([
           "vidmoly.biz",      // trdekho=5: AdSense + adblock detection stripped
           "gdmirrorbot.nl",   // trdekho=6: fake play-button window.open redirect blocked
+          "cloudy.upns.one",  // trdekho=2/3 MirrorBot: fake play-button redirect blocked
         ]);
         let useSandbox = false;
         let embedUrl = cdnUrl;

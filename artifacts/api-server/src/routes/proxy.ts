@@ -22,6 +22,7 @@ const ALLOWED_HOSTS = new Set([
   "abyssplayer.com",    // trdekho=1 HydraX
   "vidmoly.biz",        // trdekho=5 VidMoly
   "gdmirrorbot.nl",     // trdekho=6 GD MirrorBot (fake play-button redirect via window.open)
+  "cloudy.upns.one",    // trdekho=2/3 MirrorBot (fake play-button redirect)
 ]);
 
 // Per-host Referer override — defaults to anineko.to for other hosts
@@ -31,6 +32,7 @@ const HOST_REFERER: Record<string, string> = {
   "abyssplayer.com": "https://animedekho.app/",
   "vidmoly.biz": "https://animedekho.app/",
   "gdmirrorbot.nl": "https://animedekho.app/",
+  "cloudy.upns.one": "https://animedekho.app/",
 };
 
 // Per-host ad script patterns to strip
@@ -50,6 +52,15 @@ const AD_PATTERNS: Record<string, RegExp[]> = {
   "otakuhg.site": [
     /\(function\(s\)\{s\.dataset\.zone=[^}]+\}\)\([^)]+\)/g,
     /<script[^>]*al5sm\.com[^>]*>[\s\S]*?<\/script>/gi,
+  ],
+  // cloudy.upns.one (MirrorBot): Vite-bundled player — redirect via window.open blocked by
+  // POPUP_BLOCKER (Object.defineProperty runs before deferred module script).
+  // Also strip GTM + Yandex analytics.
+  "cloudy.upns.one": [
+    /<script[^>]+src="[^"]*googletagmanager[^"]*"[^>]*><\/script>/gi,
+    /<script[^>]*>\s*window\.dataLayer[\s\S]*?function gtag[\s\S]*?<\/script>/gi,
+    /<script[^>]+src="[^"]*yandex\.ru\/metrika[^"]*"[^>]*><\/script>/gi,
+    /<script[^>]*>\s*window\.ym[\s\S]*?ym\s*\(\s*\d+[\s\S]*?<\/script>/gi,
   ],
   // gdmirrorbot.nl (trdekho=6): fake play-button redirect uses window.open (blocked by POPUP_BLOCKER).
   // Strip iqsmartgames.com ad-domain reference in case it's referenced inline.
