@@ -361,15 +361,16 @@ ${opts.trid ? serverRows : `<div class="card" style="padding:14px 16px;color:#ef
 
 // ── Known server labels (extend as discovered) ────────────────────────────────
 
+// Confirmed via live test (Solo Leveling ep 1)
 const SERVER_LABELS: Record<number, string> = {
-  0: "HydraX (abyssplayer.com)",
-  1: "SRuby (rubystm.com)",
-  2: "MirrorBot (cloudy.upns.one)",
-  3: "Server 3 — unknown",
-  4: "Server 4 — unknown",
-  5: "Server 5 — unknown",
-  6: "Server 6 — unknown",
-  7: "Server 7 — unknown",
+  0: "⚠️ Server Down (dead — skip)",
+  1: "HydraX — abyssplayer.com (JW ads, direct iframe)",
+  2: "Pixeldrain — animedekho.app/aaa/pixel/ (ZERO ads ✅ sandbox safe)",
+  3: "SRuby — rubystm.com",
+  4: "VidCloud — vidcloud.upns.ink (CF only, looks clean ✅)",
+  5: "VidMoly — vidmoly.biz (AdSense + adblock detection)",
+  6: "GD MirrorBot — gdmirrorbot.nl (no obvious ads ✅)",
+  7: "Mirror Xerver — mirror.xerver.xyz",
 };
 
 // ── Route ─────────────────────────────────────────────────────────────────────

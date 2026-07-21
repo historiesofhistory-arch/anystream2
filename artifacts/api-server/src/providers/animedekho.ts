@@ -410,12 +410,23 @@ async function fetchTrid(episodeSlug: string): Promise<number> {
 const watchIframeCache = new TtlCache<string>(5 * 60_000);
 const WATCH_IFRAME_TTL = 30 * 60_000;
 
-/** Server IDs to try in order: 0=HydraX (abyssplayer), 1=SRuby, 2=MirrorBot. */
-const TRDEKHO_SERVERS = [0, 1, 2] as const;
+/**
+ * Server IDs (confirmed via live test, Solo Leveling ep 1):
+ *   0 = Server Down (dead — skip)
+ *   1 = HydraX      abyssplayer.com        direct iframe (JW ads remain)
+ *   2 = Pixeldrain   animedekho.app/aaa/pixel/  sandbox embed — zero ads
+ *   3 = SRuby        rubystm.com
+ *   4 = VidCloud     vidcloud.upns.ink      clean (CF only)
+ *   5 = VidMoly      vidmoly.biz            via proxy (AdSense stripped)
+ *   6 = GD MirrorBot gdmirrorbot.nl         clean
+ *   7 = Mirror Xerver mirror.xerver.xyz
+ * Priority: Pixeldrain (2) → HydraX (1) → SRuby (3)
+ */
+const TRDEKHO_SERVERS = [2, 1, 3] as const;
 
 async function fetchWatchIframeUrl(
   trid: number,
-  server: 0 | 1 | 2,
+  server: number,
   cookie: string,
 ): Promise<string> {
   return watchIframeCache.dedupe(
@@ -712,15 +723,13 @@ async function fetchTridFromMoviePage(
 
 /**
  * Call trdekho endpoint and extract iframe src from the response.
- *   trdekho=0 → HydraX (abyssplayer.com)
- *   trdekho=1 → SRuby  (rubystm.com)
- *   trdekho=2 → MirrorBot (cloudy.upns.one)
- *   trtype=2 → TV series  trtype=1 → Movie
- *   TV episodes require the verified cookie; movies do not.
+ *   trtype=2 → TV series (requires verified cookie)
+ *   trtype=1 → Movie (no cookie needed)
+ * See TRDEKHO_SERVERS for the full server ID map.
  */
 async function fetchTrdekhoIframeSrc(
   trid: number,
-  trdekho: 0 | 1 | 2,
+  trdekho: number,
   cookie: string | null,
   trtype: 1 | 2 = 2,
 ): Promise<string | null> {
@@ -789,7 +798,7 @@ async function resolveViaSearchFallback(
       );
     }
 
-    for (const trdekho of [0, 1] as const) {
+    for (const trdekho of [2, 1, 3]) {
       const src = await fetchTrdekhoIframeSrc(trid, trdekho, null, 1);
       if (src) {
         logger.info({ anilistId, moviePageUrl, trid, trdekho, src }, "[animedekho-search] Movie via trdekho");
@@ -840,8 +849,8 @@ async function resolveViaSearchFallback(
     );
   }
 
-  // Priority order: HydraX (abyssplayer.com) → SRuby (rubystm.com)
-  for (const trdekho of [0, 1] as const) {
+  // Priority: Pixeldrain/MirrorBot (2, zero ads) → HydraX (1) → SRuby (3)
+  for (const trdekho of [2, 1, 3]) {
     const src = await fetchTrdekhoIframeSrc(trid, trdekho, cookie);
     if (src) {
       logger.info(
@@ -853,7 +862,7 @@ async function resolveViaSearchFallback(
   }
 
   throw Object.assign(
-    new Error(`All servers (HydraX, SRuby) exhausted for ${episodeSlug}`),
+    new Error(`All servers (Pixeldrain, HydraX, SRuby) exhausted for ${episodeSlug}`),
     { code: "CDN_NOT_FOUND" },
   );
 }

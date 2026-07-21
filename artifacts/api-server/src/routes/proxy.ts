@@ -19,8 +19,8 @@ const ALLOWED_HOSTS = new Set([
   "as-cdn21.top",
   "play.zephyrflick.top",
   // AnimeDekho trdekho players — proxied to strip ad scripts
-  "abyssplayer.com",
-  "cloudy.upns.one",   // trdekho=2 MirrorBot
+  "abyssplayer.com",  // trdekho=1 HydraX
+  "vidmoly.biz",      // trdekho=5 VidMoly
 ]);
 
 // Per-host Referer override — defaults to anineko.to for other hosts
@@ -28,7 +28,7 @@ const HOST_REFERER: Record<string, string> = {
   "as-cdn21.top": "https://animedekho.app/",
   "play.zephyrflick.top": "https://animedekho.app/",
   "abyssplayer.com": "https://animedekho.app/",
-  "cloudy.upns.one": "https://animedekho.app/",
+  "vidmoly.biz": "https://animedekho.app/",
 };
 
 // Per-host ad script patterns to strip
@@ -49,12 +49,20 @@ const AD_PATTERNS: Record<string, RegExp[]> = {
     /\(function\(s\)\{s\.dataset\.zone=[^}]+\}\)\([^)]+\)/g,
     /<script[^>]*al5sm\.com[^>]*>[\s\S]*?<\/script>/gi,
   ],
-  // cloudy.upns.one (MirrorBot): strip JW advertising and popup/redirect scripts
-  "cloudy.upns.one": [
-    /<script[^>]+src="[^"]*jwpsrv\.js[^"]*"[^>]*><\/script>/gi,
-    /<script[^>]+src="[^"]*googletagmanager[^"]*"[^>]*><\/script>/gi,
-    /<script[^>]*\bads?\b[^>]*src="[^"]*"[^>]*><\/script>/gi,
-    /window\.dataLayer\s*=\s*window\.dataLayer[^;]*;/g,
+  // vidmoly.biz (trdekho=5): strip Google AdSense, adblock detector, vj_vs ad widget, Yandex
+  "vidmoly.biz": [
+    // Google AdSense display ads
+    /<script[^>]+src="[^"]*googlesyndication\.com[^"]*"[^>]*>\s*<\/script>/gi,
+    // IAB adblock detector — once removed, overlay can never trigger
+    /<script[^>]+src="[^"]*AdBlockDetection[^"]*"[^>]*>\s*<\/script>/gi,
+    // vidmolyadblocktest hidden div (the element adblock detectors probe for)
+    /<div[^>]+id="vidmolyadblocktest"[^>]*><\/div>/gi,
+    // vj_vs ad widget div
+    /<div[^>]+id="vj_vs"[^>]*><\/div>/gi,
+    // vj_vs loader script block (fetches ad content from cdn.vidmoly.me/vj/)
+    /<script[^>]*>[\s\S]*?function vj_vs\(\)[\s\S]*?<\/script>/gi,
+    // Yandex Metrika analytics
+    /<script[^>]*>[\s\S]{0,50}yandex\.ru\/metrika[\s\S]*?<\/script>/gi,
   ],
   // abyssplayer.com: strip JW advertising + Google Analytics + domain redirect check
   "abyssplayer.com": [
