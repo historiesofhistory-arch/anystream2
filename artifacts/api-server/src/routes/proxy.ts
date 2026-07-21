@@ -98,6 +98,45 @@ const AD_PATTERNS: Record<string, RegExp[]> = {
   ],
 };
 
+// Hosts for which we serve a sandbox-wrapper instead of fetching + modifying HTML.
+// These are Vite SPAs that read window.location.hash for the video slug.
+// Proxying their HTML breaks: (a) hash fragment stripped in server fetch,
+// (b) crossorigin module scripts fail CORS from our domain.
+// Solution: serve a minimal wrapper that embeds the original URL in a sandboxed
+// iframe — hash is preserved, player works normally, popups/redirects are blocked
+// (sandbox strips allow-popups and allow-top-navigation).
+const SANDBOX_WRAPPER_HOSTS = new Set([
+  "cloudy.upns.one",   // MirrorBot — Vite SPA, reads #hash for slug
+  "gdmirrorbot.nl",    // GD MirrorBot — same pattern
+]);
+
+function buildSandboxWrapper(originalUrl: string): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;background:#000;overflow:hidden}
+iframe{width:100%;height:100%;border:none;display:block}
+</style>
+</head>
+<body>
+<iframe
+  src="${originalUrl}"
+  allow="autoplay; fullscreen; picture-in-picture"
+  allowfullscreen
+  sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
+></iframe>
+</body>
+</html>`;
+  // sandbox attrs intentionally OMIT:
+  //   allow-popups            → window.open() silently fails
+  //   allow-top-navigation    → iframe cannot navigate parent/top frame
+  //   allow-top-navigation-by-user-activation → blocks click-triggered redirects
+}
+
 // Fix relative asset URLs → absolute for a given host
 function fixRelativeUrls(html: string, origin: string): string {
   return html
