@@ -131,7 +131,10 @@ router.get(
         // All other trdekho player URLs → embed directly, no sandbox.
         const CDN_SANDBOX_HOSTS = new Set(["as-cdn21.top", "play.zephyrflick.top"]);
         // trdekho players routed through /api/proxy for ad stripping
-        const PROXY_PLAYER_HOSTS = new Set(["vidmoly.biz"]);
+        const PROXY_PLAYER_HOSTS = new Set([
+          "vidmoly.biz",      // trdekho=5: AdSense + adblock detection stripped
+          "gdmirrorbot.nl",   // trdekho=6: fake play-button window.open redirect blocked
+        ]);
         let useSandbox = false;
         let embedUrl = cdnUrl;
         try {

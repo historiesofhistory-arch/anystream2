@@ -19,8 +19,9 @@ const ALLOWED_HOSTS = new Set([
   "as-cdn21.top",
   "play.zephyrflick.top",
   // AnimeDekho trdekho players — proxied to strip ad scripts
-  "abyssplayer.com",  // trdekho=1 HydraX
-  "vidmoly.biz",      // trdekho=5 VidMoly
+  "abyssplayer.com",    // trdekho=1 HydraX
+  "vidmoly.biz",        // trdekho=5 VidMoly
+  "gdmirrorbot.nl",     // trdekho=6 GD MirrorBot (fake play-button redirect via window.open)
 ]);
 
 // Per-host Referer override — defaults to anineko.to for other hosts
@@ -29,6 +30,7 @@ const HOST_REFERER: Record<string, string> = {
   "play.zephyrflick.top": "https://animedekho.app/",
   "abyssplayer.com": "https://animedekho.app/",
   "vidmoly.biz": "https://animedekho.app/",
+  "gdmirrorbot.nl": "https://animedekho.app/",
 };
 
 // Per-host ad script patterns to strip
@@ -48,6 +50,11 @@ const AD_PATTERNS: Record<string, RegExp[]> = {
   "otakuhg.site": [
     /\(function\(s\)\{s\.dataset\.zone=[^}]+\}\)\([^)]+\)/g,
     /<script[^>]*al5sm\.com[^>]*>[\s\S]*?<\/script>/gi,
+  ],
+  // gdmirrorbot.nl (trdekho=6): fake play-button redirect uses window.open (blocked by POPUP_BLOCKER).
+  // Strip iqsmartgames.com ad-domain reference in case it's referenced inline.
+  "gdmirrorbot.nl": [
+    /['"]https?:\/\/[^'"]*iqsmartgames\.com[^'"]*['"]/gi,
   ],
   // vidmoly.biz (trdekho=5): strip Google AdSense, adblock detector, vj_vs ad widget, Yandex
   "vidmoly.biz": [
@@ -87,10 +94,20 @@ function fixRelativeUrls(html: string, origin: string): string {
     .replace(/(src|href)='\/([^']+)'/g, `$1='${origin}/$2'`);
 }
 
-// Inject popup blocker before </head>
+// Inject popup/redirect blocker before </head>.
+// Uses Object.defineProperty so obfuscated scripts can't reassign window.open.
 const POPUP_BLOCKER = `<script>
-  window.open = function(){ return null; };
-  window.alert = function(){};
+(function(){
+  var noop = function(){ return null; };
+  try {
+    Object.defineProperty(window, 'open',    { value: noop, writable: false, configurable: false });
+    Object.defineProperty(window, 'alert',   { value: noop, writable: false, configurable: false });
+    Object.defineProperty(window, 'confirm', { value: noop, writable: false, configurable: false });
+    Object.defineProperty(window, 'prompt',  { value: noop, writable: false, configurable: false });
+  } catch(e) {
+    window.open = window.alert = window.confirm = window.prompt = noop;
+  }
+})();
 </script>`;
 
 /**
