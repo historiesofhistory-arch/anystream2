@@ -126,34 +126,25 @@ router.get(
     if (provider === "ad") {
       try {
         const cdnUrl = await resolveAnimeDekhoUrl(anilistId, epNo);
-        // CDN embed hosts → sandbox (blocks popup ads) and embed directly.
-        // abyssplayer.com → route through proxy to strip JW advertising scripts;
-        //   sandbox must remain OFF (abyssplayer detects and rejects it).
-        // All other trdekho player URLs → embed directly, no sandbox.
+        // Embed rules per server:
+        //   CDN hosts (as-cdn21.top, play.zephyrflick.top) → sandbox (blocks popup ads)
+        //   Pixeldrain (animedekho.app/aaa/pixel/)          → sandbox (zero ads)
+        //   VidMoly (vidmoly.biz)                           → direct iframe (minimal ads)
+        //   HydraX (abyssplayer.com)                        → direct iframe (JW pre-roll)
+        //   All others                                       → direct iframe
         const CDN_SANDBOX_HOSTS = new Set(["as-cdn21.top", "play.zephyrflick.top"]);
-        // trdekho players routed through /api/proxy for ad stripping
-        const PROXY_PLAYER_HOSTS = new Set([
-          "vidmoly.biz",      // trdekho=5: AdSense + adblock detection stripped
-          "gdmirrorbot.nl",   // trdekho=6: fake play-button window.open redirect blocked
-          "cloudy.upns.one",  // trdekho=2/3 MirrorBot: fake play-button redirect blocked
-        ]);
         let useSandbox = false;
         let embedUrl = cdnUrl;
         try {
           const parsed = new URL(cdnUrl);
           const { hostname, pathname } = parsed;
           if (CDN_SANDBOX_HOSTS.has(hostname)) {
-            // AnimeDekho VidStream CDN — sandbox blocks popup ads
             useSandbox = true;
           } else if (hostname === "animedekho.app" && pathname.startsWith("/aaa/pixel/")) {
-            // trdekho=2 MirrorBot — Pixeldrain player, zero ads, safe to sandbox
+            // Pixeldrain player — zero ads, safe to sandbox
             useSandbox = true;
-          } else if (PROXY_PLAYER_HOSTS.has(hostname)) {
-            // Route through proxy to strip ad scripts
-            embedUrl = `/api/proxy?url=${encodeURIComponent(cdnUrl)}`;
           }
-          // abyssplayer.com (HydraX): direct embed — proxy caused slug/URL issues.
-          // JW pre-roll ads remain; sandbox OFF (abyssplayer detects & rejects it).
+          // VidMoly, HydraX, all others: direct embed, no proxy, no sandbox
         } catch { /* non-URL, embed as-is */ }
         res.send(buildPage(embedUrl, anilistId, epNo, useSandbox));
       } catch (err: any) {

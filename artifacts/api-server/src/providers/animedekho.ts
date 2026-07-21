@@ -417,12 +417,12 @@ const WATCH_IFRAME_TTL = 30 * 60_000;
  *   2 = Pixeldrain   animedekho.app/aaa/pixel/  sandbox embed — zero ads
  *   3 = SRuby        rubystm.com
  *   4 = VidCloud     vidcloud.upns.ink      clean (CF only)
- *   5 = VidMoly      vidmoly.biz            via proxy (AdSense stripped)
+ *   5 = VidMoly      vidmoly.biz            direct iframe (minimal ads)
  *   6 = GD MirrorBot gdmirrorbot.nl         clean
  *   7 = Mirror Xerver mirror.xerver.xyz
- * Priority: Pixeldrain (2) → HydraX (1) → SRuby (3)
+ * Priority: VidMoly (5) → HydraX (1) → Pixeldrain (2)
  */
-const TRDEKHO_SERVERS = [2, 1, 3] as const;
+const TRDEKHO_SERVERS = [5, 1, 2] as const;
 
 async function fetchWatchIframeUrl(
   trid: number,
@@ -788,7 +788,7 @@ async function resolveViaSearchFallback(
 
     // Priority 2 & 3: trdekho via movie series page (trtype=1, no cookie needed)
     // data-lmt is present on the movie page without cookie; movies use trtype=1.
-    // Order: HydraX (trdekho=0) → SRuby (trdekho=1)
+    // Order: VidMoly (5) → HydraX (1) → Pixeldrain (2)
     const moviePageUrl = `https://animedekho.app/movie-hindi/${seriesSlug}/`;
     const trid = await fetchTridFromMoviePage(moviePageUrl);
     if (!trid) {
@@ -798,7 +798,7 @@ async function resolveViaSearchFallback(
       );
     }
 
-    for (const trdekho of [2, 1, 3]) {
+    for (const trdekho of [5, 1, 2]) {
       const src = await fetchTrdekhoIframeSrc(trid, trdekho, null, 1);
       if (src) {
         logger.info({ anilistId, moviePageUrl, trid, trdekho, src }, "[animedekho-search] Movie via trdekho");
@@ -831,7 +831,7 @@ async function resolveViaSearchFallback(
     }
   }
 
-  // Priority 2 & 3: HydraX then SRuby via trid (requires cookie)
+  // Priority 2 & 3: trdekho servers via trid (requires cookie for TV)
   const episodeSlug = `${seriesSlug}-1x${absEp}`;
   const cookie = await ensureVerifiedCookie(episodeSlug);
   if (!cookie) {
@@ -849,8 +849,8 @@ async function resolveViaSearchFallback(
     );
   }
 
-  // Priority: Pixeldrain/MirrorBot (2, zero ads) → HydraX (1) → SRuby (3)
-  for (const trdekho of [2, 1, 3]) {
+  // Priority: VidMoly (5) → HydraX (1) → Pixeldrain (2)
+  for (const trdekho of [5, 1, 2]) {
     const src = await fetchTrdekhoIframeSrc(trid, trdekho, cookie);
     if (src) {
       logger.info(
