@@ -381,18 +381,18 @@ function buildHtml(opts: {
           </div>
           <script>
             (function(){
-              var src = "${s.hls.m3u8.replace(/"/g, '\\"')}";
+              var rawSrc = "${s.hls.m3u8.replace(/"/g, '\\"')}";
+              var ref = "${s.hls.workingReferer.replace(/"/g, '\\"') || 'https://animedekho.app/'}";
+              // Always route through server-side proxy — browser cannot set Referer via XHR
+              var src = "/api/hlsadw?url=" + encodeURIComponent(rawSrc) + "&ref=" + encodeURIComponent(ref);
               var vid = document.getElementById("${pid}");
               if (Hls.isSupported()) {
-                var hls = new Hls({ xhrSetup: function(xhr){ xhr.setRequestHeader("Referer",""); } });
+                var hls = new Hls();
                 hls.loadSource(src);
                 hls.attachMedia(vid);
                 hls.on(Hls.Events.MANIFEST_PARSED, function(){ vid.play().catch(function(){}); });
                 hls.on(Hls.Events.ERROR, function(e,d){
-                  if(d.fatal){
-                    console.warn("HLS.js error, trying native",d);
-                    vid.src = src;
-                  }
+                  if(d.fatal){ console.error("HLS fatal error", d); }
                 });
               } else if (vid.canPlayType("application/vnd.apple.mpegurl")) {
                 vid.src = src;
