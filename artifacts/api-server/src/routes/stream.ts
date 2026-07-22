@@ -129,7 +129,9 @@ router.get(
         // Embed rules per server:
         //   CDN hosts (as-cdn21.top, play.zephyrflick.top) → sandbox (blocks popup ads)
         //   Pixeldrain (animedekho.app/aaa/pixel/)          → sandbox (zero ads)
-        //   VidMoly (vidmoly.biz)                           → direct iframe (minimal ads)
+        //   VidMoly (vidmoly.biz)                           → sandbox without allow-popups
+        //     → blocks ungagedhulloo.com popunder (window.open on first click)
+        //     → JW Player works fine without allow-popups
         //   HydraX (abyssplayer.com)                        → direct iframe (JW pre-roll)
         //   All others                                       → direct iframe
         const CDN_SANDBOX_HOSTS = new Set(["as-cdn21.top", "play.zephyrflick.top"]);
@@ -143,8 +145,11 @@ router.get(
           } else if (hostname === "animedekho.app" && pathname.startsWith("/aaa/pixel/")) {
             // Pixeldrain player — zero ads, safe to sandbox
             useSandbox = true;
+          } else if (hostname === "vidmoly.biz") {
+            // VidMoly — sandbox blocks popunder ad (window.open) without affecting playback
+            useSandbox = true;
           }
-          // VidMoly, HydraX, all others: direct embed, no proxy, no sandbox
+          // HydraX (abyssplayer.com): direct embed — detects and rejects sandbox
         } catch { /* non-URL, embed as-is */ }
         res.send(buildPage(embedUrl, anilistId, epNo, useSandbox));
       } catch (err: any) {
