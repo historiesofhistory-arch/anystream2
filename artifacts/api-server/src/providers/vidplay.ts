@@ -387,8 +387,16 @@ async function resolveVidPlayLink(
   // AniKoto slugs carry a short disambiguation suffix, while VidTube's
   // data-realid uses the canonical slug without that suffix. Some titles
   // also normalize punctuation differently (for example re-zero -> rezero).
-  const canonicalSlug = candidate.slug.replace(/-[a-z0-9]{5}$/i, "");
-  const canonicalSlugKey = canonicalSlug.replace(/[^a-z0-9]/gi, "").toLowerCase();
+  const slugKey = (value: string) =>
+    value
+      .replace(/-[a-z0-9]{5}$/i, "")
+      .replace(/[^a-z0-9]/gi, "")
+      .toLowerCase();
+  const expectedSlugKeys = new Set(
+    [candidate.slug, candidate.title, candidate.japaneseTitle]
+      .filter(Boolean)
+      .map(slugKey),
+  );
   const realSlugKey = realId
     .replace(/\/ep-\d+(?:\.\d+)?$/i, "")
     .replace(/[^a-z0-9]/gi, "")
@@ -396,7 +404,7 @@ async function resolveVidPlayLink(
   if (
     !realEpisode ||
     Number(realEpisode) !== episode.number ||
-    realSlugKey !== canonicalSlugKey
+    !expectedSlugKeys.has(realSlugKey)
   ) {
     throw new VidPlayError(
       "VidTube returned a different season or episode than requested",
