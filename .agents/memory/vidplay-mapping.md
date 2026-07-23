@@ -23,3 +23,9 @@ The current AniKoto page still exposes the reliable legacy AJAX chain: episode l
 **Why:** Exact season protection is required, but provider slugs and VidTube real IDs do not always preserve punctuation identically.
 
 **How to apply:** Keep provider resolution behind a cached, singleflight lookup and fail closed when the canonical slug or episode does not match. Return only the small VidTube iframe HTML; do not proxy video bytes.
+
+AniList movie IDs must not be matched to unrelated AniKoto TV/ONA search results. A title with only generic overlap such as “Zero” is not a valid match; format and distinctive title-token checks must pass or the resolver returns no-match.
+
+**Why:** A movie lookup returned an unrelated Edens Zero recap entry for an Aldnoah.Zero movie, which would have produced a playable but incorrect iframe.
+
+**How to apply:** Treat `MOVIE`, `TV`, `ONA`, and special formats as separate matching classes and fail closed when the exact AniKoto title is not present.

@@ -37,6 +37,7 @@ interface AniKotoCandidate {
   slug: string;
   title: string;
   japaneseTitle: string;
+  format: string;
   episodeCount: number;
   score: number;
 }
@@ -116,6 +117,57 @@ function bigramScore(a: string, b: string): number {
   return (2 * shared) / (aTotal + bTotal);
 }
 
+const GENERIC_TITLE_WORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "cat",
+  "movie",
+  "part",
+  "recap",
+  "season",
+  "series",
+  "special",
+  "the",
+  "zero",
+]);
+
+function titleTokens(value: string): Set<string> {
+  return new Set(
+    normalise(value)
+      .split(" ")
+      .filter(
+        (token) => token.length >= 3 && !GENERIC_TITLE_WORDS.has(token),
+      ),
+  );
+}
+
+function hasDistinctiveTitleMatch(
+  mediaTitles: string[],
+  candidate: AniKotoCandidate,
+): boolean {
+  const candidateTokens = new Set([
+    ...titleTokens(candidate.title),
+    ...titleTokens(candidate.japaneseTitle),
+  ]);
+  return mediaTitles.some((title) => {
+    for (const token of titleTokens(title)) {
+      if (candidateTokens.has(token)) return true;
+    }
+    return false;
+  });
+}
+
+function formatMatches(media: AniMedia, candidate: AniKotoCandidate): boolean {
+  const format = normalise(candidate.format);
+  if (!format) return false;
+  if (media.format === "MOVIE") return format === "movie";
+  if (media.format === "SPECIAL") return format === "special" || format === "ona";
+  if (media.format === "ONA") return format === "ona";
+  if (media.format === "TV_SHORT") return format === "tv" || format === "ona";
+  return format === "tv";
+}
+
 function titleVariants(media: AniMedia): string[] {
   return [
     media.title.english,
@@ -177,11 +229,13 @@ function parseSearchResults(html: string): AniKotoCandidate[] {
     const total = block.match(
       /class="ep-status total"[^>]*>\s*<span>\s*(\d+)/i,
     );
+    const format = block.match(/<div class="right">\s*([^<]+)/i);
     candidates.push({
       id: poster[1],
       slug: href[1],
       title: decodeHtml(title[1]),
       japaneseTitle: decodeHtml(japanese?.[1] ?? ""),
+      format: decodeHtml(format?.[1] ?? ""),
       episodeCount: Number(total?.[1] ?? 0),
       score: 0,
     });
@@ -235,6 +289,8 @@ async function resolveAniKotoCandidate(
   const requestedTitles = variants.slice(0, 5);
 
   const ranked = [...bySlug.values()]
+    .filter((candidate) => formatMatches(media, candidate))
+    .filter((candidate) => hasDistinctiveTitleMatch(requestedTitles, candidate))
     .map((candidate) => {
       const titleScore = Math.max(
         ...requestedTitles.map((title) =>

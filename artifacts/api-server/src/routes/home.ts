@@ -290,6 +290,10 @@ const HTML = `<!DOCTYPE html>
               <option value="am">AM · AniNeko (anineko.to)</option>
               <option value="ad">AD · AnimeDekho (Hindi)</option>
             </select>
+            <div style="margin-top:7px;font-size:.72rem;color:var(--muted);">
+              VidPlay के लिए <strong style="color:var(--accent2)">VP · VidPlay / VidTube</strong> चुनें।
+              Default provider बिना <code>?p=</code> के Megaplay रहता है।
+            </div>
           </div>
         </div>
         <div class="hsub-note" id="hsubNote">
@@ -326,6 +330,7 @@ const HTML = `<!DOCTYPE html>
           referrerpolicy="unsafe-url"></iframe>
       </div>
       <p class="preview-hint">Click code block to select · Use ⧉ Copy for full iframe HTML</p>
+      <p id="generatedUrl" class="preview-hint" style="overflow-wrap:anywhere;"></p>
     </div>
   </div>
 
@@ -643,6 +648,8 @@ const HTML = `<!DOCTYPE html>
     document.getElementById('output').style.display = 'block';
     document.getElementById('embedBlocks').innerHTML = blocks;
     document.getElementById('previewFrame').src = previewUrl;
+    document.getElementById('generatedUrl').innerHTML =
+      'Request URL: <code style="color:var(--accent2)">' + escHtml(previewUrl) + '</code>';
     document.getElementById('output').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
@@ -714,6 +721,8 @@ const HTML = `<!DOCTYPE html>
 
 router.get("/", (_req, res) => {
   res.removeHeader("X-Frame-Options");
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+  res.setHeader("Pragma", "no-cache");
   res.setHeader("Content-Type", "text/html; charset=UTF-8");
   res.send(HTML);
 });
