@@ -286,6 +286,7 @@ const HTML = `<!DOCTYPE html>
               <option value="hd">HD-1 · Megaplay s-5</option>
               <option value="vs">Vidstream · Megaplay s-2</option>
               <option value="vw">VidWish · vidwish.live</option>
+              <option value="vp">VP · VidPlay / VidTube</option>
               <option value="am">AM · AniNeko (anineko.to)</option>
               <option value="ad">AD · AnimeDekho (Hindi)</option>
             </select>
@@ -420,6 +421,16 @@ const HTML = `<!DOCTYPE html>
               <td style="color:var(--muted)">Alternate CDN</td>
             </tr>
             <tr>
+              <td><code style="color:var(--accent2)">vp</code></td>
+              <td>VidPlay</td>
+              <td style="color:var(--muted)">AniKoto → vidtube.site</td>
+              <td><span class="badge badge-green">sub dub hsub</span></td>
+              <td style="color:var(--muted)">
+                AniList ID → exact AniKoto season and episode → VidTube embed.
+                Matching is validated before the iframe is returned; cached and singleflight.
+              </td>
+            </tr>
+            <tr>
               <td><code style="color:var(--accent2)">am</code></td>
               <td>AniNeko</td>
               <td style="color:var(--muted)">anineko.to → vivibebe.site</td>
@@ -446,7 +457,8 @@ const HTML = `<!DOCTYPE html>
       <p style="margin-top:10px;font-size:.78rem;color:var(--muted);">
         Providers <code style="color:var(--accent2)">hd</code>, <code style="color:var(--accent2)">vs</code>,
         <code style="color:var(--accent2)">vw</code> resolve a stream ID from Megaplay — adds ~300–600 ms on first load.
-        Provider <code style="color:var(--accent2)">am</code> resolves and caches the anineko slug on first call.
+        Providers <code style="color:var(--accent2)">vp</code> and <code style="color:var(--accent2)">am</code>
+        resolve and cache an embed URL on the first call. No video bytes pass through this server.
       </p>
     </div>
 

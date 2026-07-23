@@ -39,6 +39,7 @@ GET /api/stream/anix.at/:anilistId/:epNo/:type
 | `hd` | Megaplay HD-1 | |
 | `vs` | Megaplay VidStream | |
 | `vw` | VidWish / VidCloud | |
+| `vp` | VidPlay / VidTube | AniList ID → exact AniKoto season/episode |
 | `am` | AniNeko | Supports `hsub` |
 | `ad` | AnimeDekho | Hindi dub — fallback chain: VidMoly → HydraX → Pixeldrain |
 
@@ -56,6 +57,14 @@ GET /api/stream/anix.at/:anilistId/:epNo/:type
 <!-- Solo Leveling ep 1 Hindi dub (AnimeDekho) -->
 <iframe
   src="https://your-domain.com/api/stream/anix.at/170942/1/sub?p=ad"
+  allowfullscreen
+  allow="autoplay; encrypted-media; fullscreen"
+  style="width:100%;aspect-ratio:16/9;border:none"
+></iframe>
+
+<!-- VidPlay / VidTube: same AniList ID + episode contract -->
+<iframe
+  src="https://your-domain.com/api/stream/anix.at/207141/1/sub?p=vp"
   allowfullscreen
   allow="autoplay; encrypted-media; fullscreen"
   style="width:100%;aspect-ratio:16/9;border:none"
@@ -111,7 +120,8 @@ pnpm monorepo
     │   ├── providers/
     │   │   ├── animedekho.ts     CDN + watch-page + search fallback resolver
     │   │   ├── animedekho-hls.ts Direct HLS extractor (test/experimental)
-    │   │   └── anineko.ts        AniNeko embed resolver
+    │   │   ├── anineko.ts        AniNeko embed resolver
+    │   │   └── vidplay.ts        AniKoto → VidPlay/VidTube resolver
     │   ├── routes/
     │   │   ├── stream.ts         Main /api/stream/… handler
     │   │   ├── proxy.ts          Embed proxy + ad stripping

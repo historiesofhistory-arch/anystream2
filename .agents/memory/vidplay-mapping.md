@@ -16,4 +16,10 @@ Testing Re:Zero's five returned seasons and The Daily Life of the Immortal King'
 
 **Why:** Cross-verification showed that a direct token formula would be brittle and that the authoritative mapping is maintained by AniKoto's AJAX resolver.
 
-**How to apply:** Use slug matching only to select and validate the AniKoto page. Then call the public episode/server AJAX chain to obtain the token. Validate the returned VidTube page's `data-realid` against the requested slug and episode; never synthesize the token from a slug or legacy ID.
+**How to apply:** Use slug matching only to select and validate the AniKoto page. Then call the public episode/server AJAX chain to obtain the token. Validate VidTube `data-realid` against a punctuation-normalized canonical slug and episode; never synthesize the token from a slug or legacy ID.
+
+The current AniKoto page still exposes the reliable legacy AJAX chain: episode list -> server list -> `VidPlay-1` link -> final server resolver. VidTube canonicalizes punctuation in some slugs, such as `re-zero` becoming `rezero`, so strict raw-string comparison rejects valid matches.
+
+**Why:** Exact season protection is required, but provider slugs and VidTube real IDs do not always preserve punctuation identically.
+
+**How to apply:** Keep provider resolution behind a cached, singleflight lookup and fail closed when the canonical slug or episode does not match. Return only the small VidTube iframe HTML; do not proxy video bytes.

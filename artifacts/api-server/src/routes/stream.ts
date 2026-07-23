@@ -8,6 +8,7 @@ import { resolveAnimeDekhoUrl } from "../providers/animedekho.js";
 import { resolveAnimeDekhoHls } from "../providers/animedekho-hls.js";
 import { TtlCache, fetchWithTimeout } from "../lib/cache.js";
 import { fetchAniMedia } from "../lib/anilist.js";
+import { resolveVidPlay, type AudioType } from "../providers/vidplay.js";
 
 const router = Router();
 
@@ -102,6 +103,7 @@ function buildPage(embedUrl: string, anilistId: string, epNo: string, sandbox = 
  *   vs     — Megaplay Vidstream
  *   vw     — VidWish / VidCloud
  *   am     — AniNeko (anineko.to) · supports hsub / sub / dub
+ *   vp     — VidPlay/VidTube via AniKoto · exact AniList season matching
  */
 router.get(
   "/stream/anix.at/:anilistId/:epNo/:type",
@@ -239,6 +241,33 @@ router.get(
       return;
     }
 
+    // ── VP provider (VidPlay/VidTube) ─────────────────────────────────────
+    // Resolves only the small embed URL. The video is loaded directly by the
+    // returned iframe, so this API never proxies video bytes.
+    if (provider === "vp" || provider === "vidplay") {
+      const vpType: AudioType =
+        type === "hsub" ? "hsub" : type === "dub" ? "dub" : "sub";
+      try {
+        const embedUrl = await resolveVidPlay(anilistId, epNo, vpType);
+        res.send(buildPage(embedUrl, anilistId, epNo));
+      } catch (err: any) {
+        const status =
+          err?.code === "NO_ANIKOTO_MATCH" || err?.code === "EPISODE_NOT_FOUND"
+            ? 404
+            : err?.code === "NO_ANILIST_MEDIA"
+              ? 404
+              : 502;
+        res.status(status).json({
+          error: err?.message ?? "VidPlay resolution failed",
+          code: err?.code ?? "UPSTREAM_ERROR",
+          anilistId,
+          epNo,
+          type: vpType,
+        });
+      }
+      return;
+    }
+
     // ── Megaplay providers (hd / vs / vw) and default ────────────────────
 
     // hsub is only valid for AM; fall back to sub for Megaplay providers
@@ -273,7 +302,7 @@ router.get(
       res
         .status(400)
         .send(
-          `Unknown provider "${provider}". Available: ${["am", "ad", ...Object.keys(PROVIDERS)].join(", ")}`,
+          `Unknown provider "${provider}". Available: ${["vp", "am", "ad", ...Object.keys(PROVIDERS)].join(", ")}`,
         );
       return;
     }

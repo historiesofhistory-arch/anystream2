@@ -25,6 +25,8 @@ export interface AniMedia {
   title: { english: string | null; romaji: string | null };
   episodes: number | null;
   synonyms: string[];
+  season: "WINTER" | "SPRING" | "SUMMER" | "FALL" | null;
+  seasonYear: number | null;
 }
 
 const cache = new Map<string, { media: AniMedia; ts: number }>();
@@ -41,7 +43,7 @@ export async function fetchAniMedia(anilistId: string): Promise<AniMedia | null>
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
-          query: `query($id:Int){Media(id:$id,type:ANIME){idMal format title{english romaji}episodes synonyms}}`,
+          query: `query($id:Int){Media(id:$id,type:ANIME){idMal format season seasonYear title{english romaji}episodes synonyms}}`,
           variables: { id: Number(anilistId) },
         }),
       },
