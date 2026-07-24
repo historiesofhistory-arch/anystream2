@@ -96,6 +96,79 @@ function buildPage(embedUrl: string, anilistId: string, epNo: string, sandbox = 
 }
 
 /**
+ * Resolve a VidStream (Megaplay s-2) embed URL via MAL path.
+ * Returns null on any failure so callers can fall through to the next layer.
+ */
+async function resolveVidStreamUrl(
+  anilistId: string,
+  epNo: string,
+  streamType: string,
+  malId: number,
+): Promise<string | null> {
+  const realId = await fetchRealId(anilistId, epNo, streamType, malId, epNo);
+  if (!realId) return null;
+  return `https://megaplay.buzz/stream/s-2/${realId}/${streamType}`;
+}
+
+/**
+ * GET /api/stream/anix.at/:anilistId/:epNo/:type/co   — Core (combined)
+ *
+ * Tries VidStream (MAL path) first, then falls back to VidPlay.
+ * Audio type is preserved exactly — sub stays sub, dub stays dub.
+ * If both layers fail the request returns 502.
+ *
+ * Named "Core" because it chains the two most reliable providers
+ * without exposing provider internals to the caller.
+ */
+router.get(
+  "/stream/anix.at/:anilistId/:epNo/:type/co",
+  async (req, res) => {
+    const { anilistId, epNo, type } = req.params;
+
+    if (!/^\d+$/.test(anilistId) || !/^\d+$/.test(epNo)) {
+      res.status(400).send("Bad Request: anilistId and epNo must be numbers");
+      return;
+    }
+
+    res.removeHeader("X-Frame-Options");
+    res.setHeader("Content-Security-Policy", "frame-ancestors *");
+    res.setHeader("Content-Type", "text/html; charset=UTF-8");
+    res.setHeader("Cache-Control", "public, max-age=300");
+
+    const streamType = type === "dub" ? "dub" : "sub";
+    const vpType: AudioType = type === "hsub" ? "hsub" : type === "dub" ? "dub" : "sub";
+
+    // ── Layer 1: VidStream via MAL path ──────────────────────────────────
+    const media = await fetchAniMedia(anilistId).catch(() => null);
+    const malId = media?.idMal ?? null;
+
+    if (malId) {
+      const vsUrl = await resolveVidStreamUrl(anilistId, epNo, streamType, malId);
+      if (vsUrl) {
+        res.send(buildPage(vsUrl, anilistId, epNo));
+        return;
+      }
+    }
+
+    // ── Layer 2: VidPlay via AniKoto ─────────────────────────────────────
+    try {
+      const vpUrl = await resolveVidPlay(anilistId, epNo, vpType);
+      res.send(buildPage(vpUrl, anilistId, epNo));
+      return;
+    } catch {
+      // both layers failed — fall through to error
+    }
+
+    res.status(502).json({
+      error: "Both VidStream and VidPlay failed for this episode",
+      anilistId,
+      epNo,
+      type: streamType,
+    });
+  },
+);
+
+/**
  * GET /api/stream/anix.at/:anilistId/:epNo/:type[?p=provider]
  *
  * Types:  sub | dub | hsub
@@ -103,10 +176,13 @@ function buildPage(embedUrl: string, anilistId: string, epNo: string, sandbox = 
  * Providers (?p=):
  *   (none) — Default Megaplay (no extra fetch)
  *   hd     — Megaplay HD-1
- *   vs     — Megaplay Vidstream
+ *   vs     — Megaplay Vidstream  (always uses MAL path)
  *   vw     — VidWish / VidCloud
  *   am     — AniNeko (anineko.to) · supports hsub / sub / dub
  *   vp     — VidPlay/VidTube via AniKoto · exact AniList season matching
+ *
+ * Shorthand (path suffix, no query string):
+ *   /co    — Core: VidStream → VidPlay fallback
  */
 router.get(
   "/stream/anix.at/:anilistId/:epNo/:type",
