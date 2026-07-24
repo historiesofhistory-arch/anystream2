@@ -39,12 +39,15 @@ async function fetchRealId(
   epNo: string,
   type: string,
   malId?: number,
+  malEpNo?: string, // episode to use on the mal path; defaults to "1" (movies)
 ): Promise<string | null> {
-  // For movies: probe via MAL ID (AniList ID not indexed by Megaplay for movies)
+  // mal path: used for movies (always ep 1) and vs provider (actual epNo)
   const probeUrl = malId
-    ? `https://megaplay.buzz/stream/mal/${malId}/1/${type}`
+    ? `https://megaplay.buzz/stream/mal/${malId}/${malEpNo ?? "1"}/${type}`
     : `https://megaplay.buzz/stream/ani/${anilistId}/${epNo}/${type}`;
-  const cacheKey = malId ? `mal:${malId}:${type}` : `${anilistId}:${epNo}:${type}`;
+  const cacheKey = malId
+    ? `mal:${malId}:${malEpNo ?? "1"}:${type}`
+    : `${anilistId}:${epNo}:${type}`;
   return realIdCache.dedupe(
     cacheKey,
     async () => {
@@ -273,12 +276,14 @@ router.get(
     // hsub is only valid for AM; fall back to sub for Megaplay providers
     const streamType = type === "dub" ? "dub" : "sub";
 
-    // Fetch media info to check for movies (MAL ID needed for movie support)
+    // Fetch media info.
+    // MAL ID is needed for: movies (all providers) + vs (VidStream, all formats incl. TV)
     const megaMedia = await fetchAniMedia(anilistId).catch(() => null);
-    const isMovie = megaMedia?.format === "MOVIE";
-    const malId = isMovie ? (megaMedia?.idMal ?? null) : null;
+    const isMovie   = megaMedia?.format === "MOVIE";
+    const needsMal  = isMovie || provider === "vs";
+    const malId     = needsMal ? (megaMedia?.idMal ?? null) : null;
 
-    // Movies require a MAL ID for Megaplay — if AniList has no MAL mapping, bail out
+    // Movies require a MAL ID on all Megaplay providers
     if (isMovie && !malId) {
       res.status(404).json({
         error:
@@ -289,8 +294,18 @@ router.get(
       return;
     }
 
+    // vs (VidStream) always probes via MAL path — requires a MAL ID even for TV
+    if (provider === "vs" && !malId) {
+      res.status(404).json({
+        error:
+          "VidStream (?p=vs) requires a MAL ID but none was found for this AniList ID.",
+        anilistId,
+      });
+      return;
+    }
+
     if (!provider) {
-      // Default Megaplay: for movies use MAL ID internally; TV uses AniList ID as before
+      // Default Megaplay: movies → mal path; TV → ani path
       const embedUrl = isMovie
         ? `https://megaplay.buzz/stream/mal/${malId}/1/${streamType}`
         : `https://megaplay.buzz/stream/ani/${anilistId}/${epNo}/${streamType}`;
@@ -307,8 +322,16 @@ router.get(
       return;
     }
 
-    // For movies: fetchRealId probes via MAL ID; for TV: probes via AniList ID as before
-    const realId = await fetchRealId(anilistId, epNo, streamType, malId ?? undefined);
+    // vs: always probe mal path with actual epNo (TV + movies)
+    // movies on other providers: probe mal path with ep 1
+    // TV on hd/vw: probe ani path as before
+    const realId = await fetchRealId(
+      anilistId,
+      epNo,
+      streamType,
+      malId ?? undefined,
+      provider === "vs" ? epNo : undefined, // vs passes actual epNo; movies default to "1"
+    );
     if (!realId) {
       res.status(502).send("Could not resolve stream ID from Megaplay");
       return;
