@@ -27,6 +27,7 @@
  */
 
 import { fetchWithTimeout } from "../lib/cache.js";
+import { fetchAdw } from "../lib/proxy.js";
 import { fetchAniMedia } from "../lib/anilist.js";
 import { logger } from "../lib/logger.js";
 
@@ -69,7 +70,7 @@ export function slugifyForHls(title: string): string {
 
 async function fetchTrid(episodeSlug: string): Promise<number | null> {
   try {
-    const res = await fetchWithTimeout(
+    const res = await fetchAdw(
       `https://animedekho.app/epi/${episodeSlug}/`,
       { headers: ADW_HEADERS },
       12_000,
@@ -94,7 +95,7 @@ async function fetchTrid(episodeSlug: string): Promise<number | null> {
 
 async function fetchVerifiedCookie(episodeSlug: string): Promise<string | null> {
   try {
-    const pageRes = await fetchWithTimeout(
+    const pageRes = await fetchAdw(
       `https://animedekho.app/epi/${episodeSlug}/`,
       { headers: ADW_HEADERS },
       12_000,
@@ -110,7 +111,7 @@ async function fetchVerifiedCookie(episodeSlug: string): Promise<string | null> 
       return "toronites_server=vidstream";
     }
 
-    const verRes = await fetchWithTimeout(
+    const verRes = await fetchAdw(
       verifyUrl,
       {
         headers: {
@@ -142,7 +143,7 @@ async function getTrdekhoEmbed(
   cookie: string,
 ): Promise<string | null> {
   try {
-    const res = await fetchWithTimeout(
+    const res = await fetchAdw(
       `https://animedekho.app/?trdekho=${server}&trid=${trid}&trtype=2`,
       { headers: { ...ADW_HEADERS, Cookie: cookie } },
       12_000,
@@ -207,7 +208,7 @@ async function fetchEmbedHtml(embedUrl: string): Promise<string | null> {
 
   for (const headers of attempts) {
     try {
-      const res = await fetchWithTimeout(embedUrl, { headers }, 12_000);
+      const res = await fetchAdw(embedUrl, { headers }, 12_000);
       if (res.ok) return await res.text();
     } catch { /* try next */ }
   }
@@ -220,7 +221,7 @@ async function fetchEmbedHtml(embedUrl: string): Promise<string | null> {
  */
 async function testDirectAccess(url: string): Promise<boolean> {
   try {
-    const res = await fetchWithTimeout(
+    const res = await fetchAdw(
       url,
       {
         method: "HEAD",

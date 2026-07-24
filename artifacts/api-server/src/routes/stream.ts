@@ -135,14 +135,24 @@ router.get(
     res.setHeader("Content-Type", "text/html; charset=UTF-8");
     res.setHeader("Cache-Control", "public, max-age=300");
 
+    // Validate type — only sub, dub, hsub are accepted on the /co route.
+    if (type !== "sub" && type !== "dub" && type !== "hsub") {
+      res.status(400).send(
+        `Invalid type "${type}". Accepted values: sub, dub, hsub.`,
+      );
+      return;
+    }
+
+    const vpType: AudioType = type as AudioType;
+    // VidStream does not support hard-subtitles; use "sub" as the wire type.
     const streamType = type === "dub" ? "dub" : "sub";
-    const vpType: AudioType = type === "hsub" ? "hsub" : type === "dub" ? "dub" : "sub";
 
     // ── Layer 1: VidStream via MAL path ──────────────────────────────────
+    // Skip entirely for hsub — VidStream has no hard-subtitle track.
     const media = await fetchAniMedia(anilistId).catch(() => null);
     const malId = media?.idMal ?? null;
 
-    if (malId) {
+    if (type !== "hsub" && malId) {
       const vsUrl = await resolveVidStreamUrl(anilistId, epNo, streamType, malId);
       if (vsUrl) {
         res.send(buildPage(vsUrl, anilistId, epNo));

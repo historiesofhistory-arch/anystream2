@@ -26,6 +26,7 @@
  */
 
 import { TtlCache, fetchWithTimeout } from "../lib/cache.js";
+import { fetchAdw } from "../lib/proxy.js";
 import { fetchAniMedia } from "../lib/anilist.js";
 import { logger } from "../lib/logger.js";
 
@@ -54,7 +55,7 @@ async function getFribbMap(): Promise<Map<number, TmdbMapping>> {
   if (_fribbMap) return _fribbMap;
   if (_fribbLoading) return _fribbLoading;
 
-  _fribbLoading = fetchWithTimeout(
+  _fribbLoading = fetchAdw(
     "https://raw.githubusercontent.com/Fribb/anime-lists/master/anime-list-full.json",
     { headers: { Accept: "application/json" } },
     30_000,
@@ -112,7 +113,7 @@ async function fetchEmbedHtml(
   ep: number,
 ): Promise<string | null> {
   try {
-    const res = await fetchWithTimeout(
+    const res = await fetchAdw(
       `https://animedekho.app/embed/${tmdbId}/${season}-${ep}`,
       { headers: ANIMEDEKHO_HEADERS },
       12_000,
@@ -126,7 +127,7 @@ async function fetchEmbedHtml(
 /** Fetch AnimeDekho movie embed page HTML, or null on error. */
 async function fetchMovieEmbedHtml(tmdbId: number): Promise<string | null> {
   try {
-    const res = await fetchWithTimeout(
+    const res = await fetchAdw(
       `https://animedekho.app/embed/${tmdbId}`,
       { headers: ANIMEDEKHO_HEADERS },
       12_000,
@@ -281,7 +282,7 @@ async function ensureVerifiedCookie(episodeSlug: string): Promise<string | null>
   _adwCookieInflight = (async (): Promise<string | null> => {
     try {
       // Step 1 — get a fresh server-signed verify URL from the episode page
-      const pageRes = await fetchWithTimeout(
+      const pageRes = await fetchAdw(
         `https://animedekho.app/epi/${episodeSlug}/`,
         { headers: ANIMEDEKHO_HEADERS },
         12_000,
@@ -304,7 +305,7 @@ async function ensureVerifiedCookie(episodeSlug: string): Promise<string | null>
       }
 
       // Step 2 — call verify.php; server sets Set-Cookie: toronites_server=...
-      const verRes = await fetchWithTimeout(
+      const verRes = await fetchAdw(
         verifyUrl,
         {
           headers: {
@@ -358,7 +359,7 @@ async function fetchTrid(episodeSlug: string): Promise<number> {
   return tridCache.dedupe(
     `trid:${episodeSlug}`,
     async () => {
-      const res = await fetchWithTimeout(
+      const res = await fetchAdw(
         `https://animedekho.app/epi/${episodeSlug}/`,
         { headers: ANIMEDEKHO_HEADERS },
         12_000,
@@ -432,7 +433,7 @@ async function fetchWatchIframeUrl(
   return watchIframeCache.dedupe(
     `wp:${trid}:${server}`,
     async () => {
-      const res = await fetchWithTimeout(
+      const res = await fetchAdw(
         `https://animedekho.app/?trdekho=${server}&trid=${trid}&trtype=2`,
         {
           headers: {
@@ -575,7 +576,7 @@ async function searchAdwSeries(
         // ── Guard 1: skip trivially-short titles (too many false matches) ───────
         if (!title || title.trim().length < 6) continue;
 
-        const res = await fetchWithTimeout(
+        const res = await fetchAdw(
           `https://animedekho.app/?s=${encodeURIComponent(title)}`,
           { headers: ANIMEDEKHO_HEADERS },
           10_000,
@@ -594,7 +595,7 @@ async function searchAdwSeries(
         const isMovie = type === "movie-hindi";
 
         // Fetch series page to extract TMDB ID + page title for verification
-        const sRes = await fetchWithTimeout(
+        const sRes = await fetchAdw(
           `https://animedekho.app/${type}/${slug}/`,
           { headers: ANIMEDEKHO_HEADERS },
           10_000,
@@ -622,7 +623,7 @@ async function searchAdwSeries(
         let anilistIdVerified = false;
         if (tmdbId) {
           try {
-            const vRes = await fetchWithTimeout(
+            const vRes = await fetchAdw(
               `https://animedekho.app/download/map/anilist.php?id=${tmdbId}`,
               { headers: ANIMEDEKHO_HEADERS },
               8_000,
@@ -678,7 +679,7 @@ async function fetchTridWithCookie(
   cookie: string,
 ): Promise<number | null> {
   try {
-    const res = await fetchWithTimeout(
+    const res = await fetchAdw(
       `https://animedekho.app/epi/${episodeSlug}/`,
       { headers: { ...ANIMEDEKHO_HEADERS, Cookie: cookie } },
       12_000,
@@ -704,7 +705,7 @@ async function fetchTridFromMoviePage(
   moviePageUrl: string,
 ): Promise<number | null> {
   try {
-    const res = await fetchWithTimeout(
+    const res = await fetchAdw(
       moviePageUrl,
       { headers: ANIMEDEKHO_HEADERS },
       12_000,
@@ -736,7 +737,7 @@ async function fetchTrdekhoIframeSrc(
   try {
     const headers: Record<string, string> = { ...ANIMEDEKHO_HEADERS };
     if (cookie) headers.Cookie = cookie;
-    const res = await fetchWithTimeout(
+    const res = await fetchAdw(
       `https://animedekho.app/?trdekho=${trdekho}&trid=${trid}&trtype=${trtype}`,
       { headers },
       12_000,

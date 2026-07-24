@@ -297,7 +297,7 @@ const HTML = `<!DOCTYPE html>
           </div>
         </div>
         <div class="hsub-note" id="hsubNote">
-          ⚠️ HSub is only available with the <strong>AM · AniNeko</strong> provider. Provider will be set automatically.
+          ℹ️ HSub is supported by <strong>VP · VidPlay</strong> and <strong>AM · AniNeko</strong>. VP is selected by default.
         </div>
         <div class="hsub-note" id="hinNote">
           🇮🇳 Hindi Dub is only available with the <strong>AD · AnimeDekho</strong> provider. Provider will be set automatically.
@@ -597,7 +597,7 @@ const HTML = `<!DOCTYPE html>
   function effectiveProvider() {
     const lang = document.getElementById('lang').value;
     const p    = document.getElementById('provider').value;
-    if (lang === 'hsub') return 'am';   // HSub only works with AM
+    if (lang === 'hsub' && p !== 'am' && p !== 'vp') return 'vp'; // HSub needs VP or AM
     return p;
   }
 
@@ -657,14 +657,18 @@ const HTML = `<!DOCTYPE html>
     const lang = document.getElementById('lang').value;
     document.getElementById('hsubNote').classList.toggle('visible', lang === 'hsub');
     document.getElementById('hinNote').classList.toggle('visible',  lang === 'hin');
-    if (lang === 'hsub') document.getElementById('provider').value = 'am';
+    // HSub: switch to VP if current provider doesn't support hsub
+    if (lang === 'hsub') {
+      const cur = document.getElementById('provider').value;
+      if (cur !== 'am' && cur !== 'vp') document.getElementById('provider').value = 'vp';
+    }
     if (lang === 'hin')  document.getElementById('provider').value = 'ad';
   }
 
   function onProviderChange() {
     const p = document.getElementById('provider').value;
     const lang = document.getElementById('lang').value;
-    if (p !== 'am' && lang === 'hsub') {
+    if (p !== 'am' && p !== 'vp' && lang === 'hsub') {
       document.getElementById('lang').value = 'sub';
       document.getElementById('hsubNote').classList.remove('visible');
     }

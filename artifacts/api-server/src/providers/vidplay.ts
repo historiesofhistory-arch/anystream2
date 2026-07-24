@@ -18,6 +18,7 @@
 
 import { fetchAniMedia, type AniMedia } from "../lib/anilist.js";
 import { fetchWithTimeout, TtlCache } from "../lib/cache.js";
+import { fetchAniKoto } from "../lib/proxy.js";
 
 const ANIKOTO = "https://anikoto.cz";
 const VIDTUBE_HOSTS = new Set(["vidtube.site", "www.vidtube.site"]);
@@ -241,7 +242,7 @@ async function searchAniKoto(query: string): Promise<AniKotoCandidate[]> {
     key,
     async () => {
       const url = `${ANIKOTO}/filter?keyword=${encodeURIComponent(query)}`;
-      const response = await fetchWithTimeout(
+      const response = await fetchAniKoto(
         url,
         { headers: { ...ANIKOTO_HEADERS, Referer: `${ANIKOTO}/` } },
         8_000,
@@ -260,7 +261,7 @@ async function fetchEpisodes(candidate: AniKotoCandidate): Promise<AniKotoEpisod
     `episodes:${candidate.id}`,
     async () => {
       const pageUrl = `${ANIKOTO}/watch/${candidate.slug}/ep-1`;
-      const response = await fetchWithTimeout(
+      const response = await fetchAniKoto(
         `${ANIKOTO}/ajax/episode/list/${candidate.id}?style=0`,
         { headers: { ...ANIKOTO_HEADERS, Referer: pageUrl } },
         8_000,
@@ -321,7 +322,9 @@ async function resolveAniKotoCandidate(
   const queries = [
     variants[0],
     variants[1],
+    variants[2],
     variants[0] ? stripSeasonWords(variants[0]) : "",
+    variants[1] ? stripSeasonWords(variants[1]) : "",
   ].filter(
     (q, idx, all): q is string => Boolean(q) && all.indexOf(q) === idx,
   );
@@ -372,7 +375,10 @@ async function resolveAniKotoCandidate(
   // parallel to find the one whose episode list advertises the same MAL ID.
   // A MAL-confirmed hit is promoted over any title-only winner.
   if (media.idMal) {
-    const pool = ranked.slice(0, 5);
+    // Check up to 10 candidates — peekMalId results are cached (episodeCache
+    // 30 min + singleflight), so this adds negligible server load while
+    // catching cases where the correct entry sits outside the top-5 window.
+    const pool = ranked.slice(0, 10);
     const malIds = await Promise.all(pool.map((c) => peekMalId(c)));
 
     const confirmedIdx = malIds.findIndex((id) => id === media.idMal);
@@ -416,7 +422,7 @@ async function resolveVidPlayLink(
   }
 
   const pageUrl  = `${ANIKOTO}/watch/${candidate.slug}/ep-${episode.number}`;
-  const response = await fetchWithTimeout(
+  const response = await fetchAniKoto(
     `${ANIKOTO}/ajax/server/list?servers=${encodeURIComponent(episode.ids)}`,
     { headers: { ...ANIKOTO_HEADERS, Referer: pageUrl } },
     8_000,
@@ -446,7 +452,7 @@ async function resolveVidPlayLink(
     );
   }
 
-  const finalResponse = await fetchWithTimeout(
+  const finalResponse = await fetchAniKoto(
     `${ANIKOTO}/ajax/server?get=${encodeURIComponent(server.attrs["data-link-id"])}`,
     { headers: { ...ANIKOTO_HEADERS, Referer: pageUrl } },
     8_000,
